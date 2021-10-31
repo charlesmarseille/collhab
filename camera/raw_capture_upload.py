@@ -22,15 +22,15 @@ shutters = sys.argv[2]
 #shutters = gains.split(',')
 #shutters = np.arange(int(*shutters))
 
-gains = [200]
-shutter = [7000]
+gains = [1, 10, 50, 100, 200]
+shutter = [100, 500, 1000, 10000, 15000, 20000]
 
 for gain in gains:
 	for shutter in shutters:
 		now = str(dt.now())
 		fname = (now[:10]+'_'+now[11:19]).replace(':','')
-		print(f'{shutter=}')
-		print(f'{gain=}')
+		print(f'shutter: {shutter}')
+		print(f'gain: {gain}')
 		print('SSH into remote pi')
 		os.system(f'ssh -l {user} {host} libcamera-still -t 1 -o {fname}.jpg --gain 100 --shutter {shutter} --flush --nopreview --denoise off --rawfull --raw --autofocus off')
 		print(f'File saved as: raw/{fname}.dng')
@@ -39,3 +39,5 @@ for gain in gains:
 			os.mkdir('raw')
 		os.system(f'scp {user}@{host}:/home/{user}/2021* ./raw/')
 		os.system(f'ssh -l {user} {host} rm *.dng *.jpg')
+
+		#libcamera-still -t 1 -o 1.jpg --gain 10 --shutter 200 --flush --nopreview --denoise off --rawfull --raw --autofocus off
