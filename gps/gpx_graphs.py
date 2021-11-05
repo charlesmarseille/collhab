@@ -16,7 +16,7 @@ points = points[122:]
 
 # Get relevant gpx values (columns)
 ts = np.array([point.time for point in points], dtype=(np.datetime64))		# get time objects and format as datetime
-lat, lon, ele, hdop, vdop = np.array([[point.latitude, point.longitude, point.elevation, point.position_dilution, point.vertical_dilution] for point in points])	# parse interesting values
+lat, lon, ele, hdop, vdop = np.array([[point.latitude, point.longitude, point.elevation, point.position_dilution, point.vertical_dilution] for point in points]).T	# parse interesting values
 
 # Make graphs
 plt.figure()
