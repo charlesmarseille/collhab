@@ -22,4 +22,4 @@ lat, lon, ele, hdop, vdop = np.array([[point.latitude, point.longitude, point.el
 plt.figure()
 plt.plot(ts, ele)
 plt.plot(ts, vdop)
-
+plt.show()
