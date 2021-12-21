@@ -12,7 +12,7 @@ gpx = gpxpy.parse(gpx_file)		# parse the file and create gpx object
 points = gpx.tracks[0].segments[0].points	# get points from the first segment from the first track
 
 # Remove the bad points from the start of the file (depends on the gps track)
-points = points[122:]
+points = points[80:]
 
 # Get relevant gpx values (columns)
 ts = np.array([point.time for point in points], dtype=(np.datetime64))		# get time objects and format as datetime
@@ -20,6 +20,8 @@ lat, lon, ele, hdop, vdop = np.array([[point.latitude, point.longitude, point.el
 
 # Make graphs
 plt.figure()
-plt.plot(ts, ele)
-plt.plot(ts, vdop)
+plt.plot(ts, ele, label='elevation')
+plt.plot(ts, vdop, label='VDOP')
+plt.xlabel('Date')
+plt.legend()
 plt.show()

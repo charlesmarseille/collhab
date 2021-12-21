@@ -1,6 +1,5 @@
 import numpy as _np
 import rawpy as _rawpy
-from astroscrappy import detect_cosmics as _detect_cosmics
 from glob import glob as _glob
 import os as _os
 import pandas as _pd
