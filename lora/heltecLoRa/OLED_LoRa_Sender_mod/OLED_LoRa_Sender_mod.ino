@@ -21,7 +21,7 @@
 #include "heltec.h"
 #include "images.h"
 
-#define BAND    868E6  //you can set band here directly,e.g. 868E6,915E6
+#define BAND    915E6  //you can set band here directly,e.g. 868E6,915E6
 
 unsigned int counter = 0;
 String rssi = "RSSI --";
@@ -64,8 +64,8 @@ void loop()
 
   //(CM) Set LoRa FREQUENCY, SF and BANDWIDTH
   LoRa.setFrequency(915E6);
-  LoRa.setSpreadingFactor(7);                     //Default: 7, Values: Between 6 and 12
-  LoRa.setSignalBandwidth(7.8E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
+  LoRa.setSpreadingFactor(9);                     //Default: 7, Values: Between 6 and 12
+//  LoRa.setSignalBandwidth(7.8E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
 
   //
 
