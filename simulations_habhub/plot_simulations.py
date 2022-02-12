@@ -2,25 +2,67 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from glob import glob
+import haversine as hs				#"pip install haversine", library used to compute distance between gps coordinates
+
+
+# Create an example array (just for testing, not used in code)
+#a = np.array([1,2,100,3,-10,0.111])
+
 
 # get filenames
-#fnames = glob('Downloads/flight*.csv')
+fnames = glob('simulations_habhub/simulations_habhub_csv/Profile_vol_nuit/Guillaume_simu/profile_vol_nuit/*/flight*.csv')
 
-# load data for selected file in filenames (select wanted file with corresponding index)
-df = pd.read_csv('Downloads/flight_path (3).csv')
+
+# load data for selected files in filenames
+dfs = [pd.read_csv(fname, header=None) for fname in fnames]
 ts, lat, lon, alt = df.values.T
 
-# plot graph of altitude vs time
+
+# Example plot graph of lat/lon vs time
 plt.figure()
-plt.plot(ts, alt)
+plt.plot(ts, lat, label='latitude')
+plt.plot(ts, lon, label='longitude')
+plt.legend(loc='upper right')
+plt.show()
 
 asc_mask = np.diff(alt)>0	# determine ascent
 des_mask = np.diff(alt)<0	# determine descent
 
-lat_rad = lat/180*np.pi
-lon_rad = lon/180*np.pi
-# 
-delta_x = np.array([2*6371000*np.arcsin(np.sqrt(np.sin((lat_rad[i+1]-lat_rad[i])/2)**2+np.cos(lat_rad[i])*np.cos(lat_rad[i+1])*np.sin((lon_rad[i+1]-lon_rad[i])/2)**2)) for i in range(lat_rad.shape[0]-1)])
+
+alt[1:][asc_mask]			# check all altitudes that are growing (ignore first altitude value)
+alt[:-1][asc_mask]			# check all altitudes that are growing (ignore last altitude value)
+
+
+# Example compute mean latitude ascent vs mean lat descent
+mean_lat_asc = np.mean(np.diff(lat[1:][asc_mask]))
+mean_lat_des = np.mean(np.diff(lat[1:][des_mask]))
+lat_variation_percent = mean_lat_des/mean_lat_asc
+
+# Example of using haversine to determine distance from 2 gps coords:
+#loc1=(28.426846,77.088834)
+#loc2=(28.394231,77.050308)
+#hs.haversine(loc1,loc2)
+
+latlon = [(lat[i],lon[i]) for i in range(lat.shape[0])]
+
+delta_x = np.array([hs.haversine(latlon[i], latlon[i+1], unit=hs.Unit.METERS) for i in range(len(latlon)-1)])
+
+
+
+plt.figure()
+plt.plot(ts, gps_speed, label='gps speed')
+plt.legend(loc='upper right')
+plt.show()
+
+
+
+
+
+
+
+
+
+
 
 # plot cumulative distance
 d_cumul = np.zeros(delta_x.shape[0]-1)
