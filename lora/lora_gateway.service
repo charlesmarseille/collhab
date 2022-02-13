@@ -1,0 +1,16 @@
+[Unit]
+Description=test service lora 
+After=network.target
+StartLimitIntervalSec=100
+StartLimitBurst=4
+
+[Service]
+ExecStart=/bin/sh -c '/home/pi/git/single_chan_pkt_fwd/single_chan_pkt_fwd >> /home/pi/git/single_chan_pkt_fwd/single_chan_pkt_fwd_output_$(date +"%%Y-%%m-%%d").txt'
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+RestartSec=20
+User=pi
+
+[Install]
+WantedBy=multi-user.target

@@ -24,7 +24,7 @@ def get_gps():
                 lat = x[ind+17:26]
                 lon = x[ind+30:40]
                 print(lat,lon)
-                return lat,lon
+                return lat
             except:
                 pass
 #                print('bad message')
@@ -35,7 +35,7 @@ def send_lora(message):
 #    loralib.send(bytes(str(lat)+', '+str(lon), encoding='utf8'))
     loralib.send(bytes(str(message), encoding='utf8'))
 
-loralib.init(1,915000000,9)             #rx or tx (0,1), freq (Hz), spread factor (7-12)
+loralib.init(1,915000000,7)             #rx or tx (0,1), freq (Hz), spread factor (7-12)
 
 
 while True:

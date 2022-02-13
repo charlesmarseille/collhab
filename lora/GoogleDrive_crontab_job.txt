@@ -1,0 +1,6 @@
+#copy the output to Google Drive every minute
+* * * * * sudo rclone copy /home/pi/git/single_chan_pkt_fwd/single_chan_pkt_fwd_output_$(date +"\%Y-\%m-\%d").txt lora_gateway:CollHAB/experiences/ballon_strato_2/lora_update --local-no-check-updated
+
+#update a backup every 15 minutes
+*/15 * * * * cp /home/pi/git/single_chan_pkt_fwd/single_chan_pkt_fwd_output_$(date +"\%Y-\%m-\%d").txt /home/pi/git/single_chan_pkt_fwd/single_chan_pkt_fwd_output_$(date +"\%Y-\%m-\%d").txt.bak
+
