@@ -73,11 +73,12 @@ void setup() {
 
   //(CM) Set LoRa FREQUENCY, SF and BANDWIDTH
   LoRa.setFrequency(915E6);
-  LoRa.setSpreadingFactor(7);                     //Default: 7, Values: Between 6 and 12
-  //LoRa.setSignalBandwidth(125E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
-  //LoRa.setSyncWord(0x12);           // ranges 0-0xFF, default 0x34, line 172 of https://github.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/blob/master/libdeps/RadioLib/src/modules/SX127x/SX127x.h
+  LoRa.setSpreadingFactor(12);                     //Default: 7, Values: Between 6 and 12
+  //LoRa.setSignalBandwidth(62.5E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
+  //LoRa.setSyncWord(0x34);           // ranges 0-0xFF, default 0x34, line 172 of https://github.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/blob/master/libdeps/RadioLib/src/modules/SX127x/SX127x.h
   //LoRa.setPreambleLength(8);       //Default 8
-  //LoRa.setCodingRate4(7);
+  //LoRa.setCodingRate4(8);
+  //LoRa.enableCrc();
 
   //
   LoRa.receive();

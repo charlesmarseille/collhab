@@ -7,7 +7,7 @@ import haversine as hs				#"pip install haversine", library used to compute dist
 
 # Create an example array (just for testing, not used in code)
 #a = np.array([1,2,100,3,-10,0.111])
-
+print('hello')
 
 # get filenames
 fnames = glob('simulations_habhub/simulations_habhub_csv/Profile_vol_nuit/Guillaume_simu/profile_vol_nuit/*/flight*.csv')
