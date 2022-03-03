@@ -18,101 +18,186 @@
   https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series
 */
 
-
-
 #include "heltec.h"
 #include "images.h"
-
-using namespace std;
+#include <TinyGPSPlus.h>
 
 
 //(CM) uart read taken from https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series/issues/38
 //HardwareSerial Serial2(2);
 #define RXD2 23 //16 is used for OLED_RST !
 #define TXD2 17
+#define BAND 915E6  //you can set band here directly,e.g. 868E6,915E6
+#define pin_fs_elrs 36  //input pin to read PWM output from flight controler (to determine if rc link lost)
+#define pin_fs_ghost 37  //input pin to read PWM output from flight controler (to determine if rc link lost)
 
-#define BAND    915E6  //you can set band here directly,e.g. 868E6,915E6
 
+static const uint32_t GPSBaud = 9600;
 unsigned int counter = 0;
 String rssi = "RSSI --";
 String packSize = "--";
 String packet;
+float lat = 000000, lng = 000000;
+float last_good_lat = 10.1, last_good_lng = 10.1;
+int fs_elrs = 0;
+int fs_ghost = 0;
+float gps_age = 0;
 
-void logo()
-{
+/*GPS infos: https://navspark.mybigcommerce.com/content/NMEA_Format_v0.1.pdf
+  GN -> Both GPS and Beidou sats. 2 messages of GNGSA, one for each.
+  GP -> Only GPS sats. Single GPGSA message.
+  BD -> Only Beidou sats. Single BDGSA message.
+  GL -> Only Glonass sats. Single GLGSA message.
+*/
+TinyGPSPlus gps;
+
+
+void logo() {
   Heltec.display->clear();
   Heltec.display->drawXbm(0,5,logo_width,logo_height,logo_bits);
   Heltec.display->display();
 }
 
-vector<String> read_gps()
-{
-  Serial.println("start gps data reading");
-  vector<String> gps_lines;
-  vector<String> gps_lines_mod;
-  while (Serial2.available()) {
-    String gps_stream  = Serial2.readStringUntil('\n');
-    //Serial.println(gps_stream);
-    gps_lines.push_back(gps_stream);
+void displayInfo() {
+  Serial.print(F("Location: ")); 
+  if (gps.location.isValid()) {
+    Serial.print(gps.location.lat(), 6);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 6);
   }
-
-  /*GPS infos: https://navspark.mybigcommerce.com/content/NMEA_Format_v0.1.pdf
-  GN -> Both GPS and Beidou sats. 2 messages of GNGSA, one for each.
-  GP -> Only GPS sats. Single GPGSA message.
-  BD -> Only Beidou sats. Single BDGSA message.
-  GL -> Only Glonass sats. Single GLGSA message.
-  */
-  for (int i = 0; i< sizeof(gps_lines); i++){
-    String gps_prefix = gps_lines[i].substring(1,6);
-    if (gps_prefix == "GNRMC"){                                 //Time, date, position, course and speed data provided by a GNSS navigation receiver. Format:$--RMC,hhmmss.sss,x,llll.lll,a,yyyyy.yyy,a,x.x,u.u,xxxxxx,,,v*hh<CR><LF>
-      gps_lines_mod[i] = gps_lines[i].substring(6);
-    }
-    else if (gps_prefix == "GNVTG"){                            //The actual course and speed relative to the ground. Format:$--VTG,x.x,T,y.y,M,u.u,N,v.v,K,m*hh<CR><LF>
-      gps_lines_mod[i] = gps_lines[i].substring(6);
-    }
-    else if (gps_prefix == "GNGGA"){                            //Time, position and fix related data for a GPS receiver. Format:$--GGA,hhmmss.ss,llll.lll,a,yyyyy.yyy,a,x,uu,v.v,w.w,M,x.x,M,,zzzz*hh<CR><LF>
-      gps_lines_mod[i] = gps_lines[i].substring(6);
-    }
-    else if (gps_prefix == "GNGSA"){                             //GPS receiver operating mode, satellites used in the navigation solution reported by the GGA or GNS sentence and DOP values. Format:$--GSA,a,x,xx,xx,xx,xx,xx,xx,xx,xx,xx,xx,xx,xx,u.u,v.v,z.z*hh<CR><LF>
-      gps_lines_mod[i] = gps_lines[i].substring(6);
-    }
-    else if (gps_prefix == "GPGSV"){                             //Number of satellites (SV) in view, satellite ID numbers, elevation, azimuth, and SNR value. Four satellites maximum per transmission. Format:$--GSV,x,u,xx,uu,vv,zzz,ss,uu,vv,zzz,ss,…,uu,vv,zzz,ss*hh<CR><LF>
-      gps_lines_mod[i] = gps_lines[i].substring(6);
-    }
-    else if (gps_prefix == "GLGSV"){
-      gps_lines_mod[i] = gps_lines[i].substring(6);
-    }
-    else if (gps_prefix == "GLGLL"){                             //Latitude and longitude of vessel position, time of position fix and status. Format:$--GLL,llll.lll,a,yyyyy.yyy,b,hhmmss.sss,A,a*hh<CR><LF>
-      gps_lines_mod[i] = gps_lines[i].substring(6);
-    }
-    else{
-      Serial.println("No GPS prefix match");
-    }
-    for (int i=0; i<=sizeof(gps_lines_mod); i++){
-      Serial.println(gps_lines_mod[i]);
-    }
-    return gps_lines_mod;
-    
-  }
-}  
-
-void setup()
-{
-  //(CM) GPS uart init
-  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
+  else Serial.print(F("INVALID"));
   
-   //WIFI Kit series V1 not support Vext control
+  Serial.print(F("  Date/Time: "));
+  if (gps.date.isValid()) {
+    Serial.print(gps.date.month());
+    Serial.print(F("/"));
+    Serial.print(gps.date.day());
+    Serial.print(F("/"));
+    Serial.print(gps.date.year());
+  }
+  else Serial.print(F("INVALID"));
+  
+  Serial.print(F(" "));
+  if (gps.time.isValid()) {
+    if (gps.time.hour() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.hour());
+    Serial.print(F(":"));
+    if (gps.time.minute() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.minute());
+    Serial.print(F(":"));
+    if (gps.time.second() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.second());
+    Serial.print(F("."));
+    if (gps.time.centisecond() < 10) Serial.print(F("0"));
+    Serial.print(gps.time.centisecond());
+  }
+  else Serial.print(F("INVALID"));
+  
+  Serial.println();
+}
+
+// This custom version of delay() ensures that the gps object
+// is being "fed".
+static void smartDelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  do 
+  {
+    while (Serial2.available())
+      gps.encode(Serial2.read());
+  } while (millis() - start < ms);
+}
+
+static void printFloat(float val, bool valid, int len, int prec)
+{
+  if (!valid)
+  {
+    while (len-- > 1)
+      Serial.print('*');
+    Serial.print(' ');
+  }
+  else
+  {
+    Serial.print(val, prec);
+    int vi = abs((int)val);
+    int flen = prec + (val < 0.0 ? 2 : 1); // . and -
+    flen += vi >= 1000 ? 4 : vi >= 100 ? 3 : vi >= 10 ? 2 : 1;
+    for (int i=flen; i<len; ++i)
+      Serial.print(' ');
+  }
+  smartDelay(0);
+}
+
+static void printInt(unsigned long val, bool valid, int len)
+{
+  char sz[32] = "*****************";
+  if (valid)
+    sprintf(sz, "%ld", val);
+  sz[len] = 0;
+  for (int i=strlen(sz); i<len; ++i)
+    sz[i] = ' ';
+  if (len > 0) 
+    sz[len-1] = ' ';
+  Serial.print(sz);
+  smartDelay(0);
+}
+
+static void printDateTime(TinyGPSDate &d, TinyGPSTime &t)
+{
+  if (!d.isValid())
+  {
+    Serial.print(F("********** "));
+  }
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d/%02d/%02d ", d.month(), d.day(), d.year());
+    Serial.print(sz);
+  }
+  
+  if (!t.isValid())
+  {
+    Serial.print(F("******** "));
+  }
+  else
+  {
+    char sz[32];
+    sprintf(sz, "%02d:%02d:%02d ", t.hour(), t.minute(), t.second());
+    Serial.print(sz);
+  }
+
+  printInt(d.age(), d.isValid(), 5);
+  smartDelay(0);
+}
+
+static void printStr(const char *str, int len)
+{
+  int slen = strlen(str);
+  for (int i=0; i<len; ++i)
+    Serial.print(i<slen ? str[i] : ' ');
+  smartDelay(0);
+}
+
+void setup() {
+  // GPS uart init
+  Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
+
+  // GPI pins for failsafe bits
+  //gpio_reset_pin(37);
+  pinMode(pin_fs_elrs, INPUT);
+  pinMode(pin_fs_ghost, INPUT);
+  
+  //WIFI Kit series V1 not support Vext control
   Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
 
-   //(CM) Set LoRa FREQUENCY, SF and BANDWIDTH
+  // Set LoRa FREQUENCY, SF and BANDWIDTH
   LoRa.setFrequency(915E6);
-  LoRa.setSpreadingFactor(12);                     //Default: 7, Values: Between 6 and 12
+  LoRa.setSpreadingFactor(7);                     //Default: 7, Values: Between 6 and 12
   //LoRa.setSignalBandwidth(62.5E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
   //LoRa.setSyncWord(0x34);           // ranges 0-0xFF, default 0x34, line 172 of https://github.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/blob/master/libdeps/RadioLib/src/modules/SX127x/SX127x.h
   //LoRa.setPreambleLength(8);       //Default 8
   //LoRa.setCodingRate4(8);
-  //LoRa.enableCrc();
- 
+
   Heltec.display->init();
   Heltec.display->flipScreenVertically();  
   Heltec.display->setFont(ArialMT_Plain_10);
@@ -125,24 +210,67 @@ void setup()
   delay(1000);
 }
 
-void loop()
-{
-  vector<String> gps_data;
+void loop() {
+  //Print gps data to Serial
+  printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
+  printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
+  printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
+  printFloat(gps.location.lng(), gps.location.isValid(), 12, 6);
+  printInt(gps.location.age(), gps.location.isValid(), 5);
+  printDateTime(gps.date, gps.time);
+  printFloat(gps.altitude.meters(), gps.altitude.isValid(), 7, 2);
+  printFloat(gps.speed.kmph(), gps.speed.isValid(), 6, 2);
+  printInt(gps.charsProcessed(), true, 6);
+  printInt(gps.sentencesWithFix(), true, 10);
+  printInt(gps.failedChecksum(), true, 9);
+  Serial.println();
+  smartDelay(1000);
+
+  fs_elrs = digitalRead(pin_fs_elrs);
+  fs_ghost = digitalRead(pin_fs_ghost);
+  Serial.print("failsafe elrs/ghost: ");
+  Serial.print(fs_elrs);
+  Serial.print("\t");
+  Serial.println(fs_ghost);
+
+  if (millis() > 5000 && gps.charsProcessed() < 10)
+    Serial.println(F("No GPS data received: check wiring"));
+
+  //Draw to OLED screen
   Heltec.display->clear();
   Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
   Heltec.display->setFont(ArialMT_Plain_10);
-  
-  Heltec.display->drawString(0, 0, "Sending packet: ");
-  Heltec.display->drawString(90, 0, String(counter));
+
+  if (!gps.location.isValid()){
+    gps_age ++;
+    if (gps_age>59) {
+      gps_age/=60;
+      Heltec.display->drawString(70, 20, String(gps_age)+" min");
+    }
+    else {
+      Heltec.display->drawString(70, 20, String(gps_age)+" sec");
+    }
+    Heltec.display->drawString(70, 0, "No GPS fix!");
+    Heltec.display->drawString(70, 10, "GPS age:");
+    
+
+  }
+  else {
+    gps_age = 0;
+    last_good_lat = lat;
+    last_good_lng = lng; 
+  }
+  Heltec.display->drawString(0, 0,  "Count: "+String(counter));
+  Heltec.display->drawString(0, 10, "lat: "+String(last_good_lat));
+  Heltec.display->drawString(0, 20, "lat: "+String(last_good_lng));
+  Heltec.display->drawString(0, 30, "nsats: "+String(gps.satellites.value()));
+  Heltec.display->drawString(0, 40, "hdop: "+String(gps.hdop.hdop()));
+  Heltec.display->drawString(0, 50, "Failsafe elrs--ghost: "+String(fs_elrs)+"--"+String(fs_ghost));
+  Heltec.display->drawString(0, 60, "msg: "+String(packet));
   Heltec.display->display();
 
 
-  //(CM) GPS read from stream
-  gps_data = read_gps();
-
-  // send packet
-  LoRa.beginPacket();
-  
+  // Start LoRa packet sending
 /*
  * LoRa.setTxPower(txPower,RFOUT_pin);
  * txPower -- 0 ~ 20
@@ -150,14 +278,26 @@ void loop()
  *   - RF_PACONFIG_PASELECT_PABOOST -- LoRa single output via PABOOST, maximum output 20dBm
  *   - RF_PACONFIG_PASELECT_RFO     -- LoRa single output via RFO_HF / RFO_LF, maximum output 14dBm
 */
+  LoRa.enableCrc();
+  LoRa.beginPacket();
   LoRa.setTxPower(14,RF_PACONFIG_PASELECT_PABOOST);
-  LoRa.print("magog ");
-  LoRa.print(counter);
+  
+  if (gps.location.isValid()){
+    lat = gps.location.lat()*10000;
+    lng = gps.location.lng()*10000;
+  }
+  String nsats = "00";
+  if (gps.satellites.value()<10) nsats = "0"+String(gps.satellites.value());
+  String gps_time = String(gps.time.hour())+String(gps.time.minute())+String(gps.time.second());
+//  String packet = gps_time+String(lat)+String(lng)+nsats;
+  String packet = String(fs_elrs)+String(fs_ghost);
+  LoRa.print(packet);
   LoRa.endPacket();
+  Serial.println(packet);
 
   counter++;
   digitalWrite(LED, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(1);                       // wait for a second
+  delay(2);                       // wait for a second
   digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
-  delay(1);                       // wait for a second
+  delay(2);                       // wait for a second
 }

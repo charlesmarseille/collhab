@@ -22,7 +22,6 @@
 */
 #include "heltec.h" 
 #include "images.h"
-#include "String.h"
 
 #define BAND    915E6  //you can set band here directly,e.g. 868E6,915E6
 String rssi = "RSSI --";
@@ -36,10 +35,22 @@ void logo(){
 }
 
 void LoRaData(){
+  int mess_len = 14;
+  String mess_num = packet(0,6);
+  int latl = 6;
+  int nsatsl = 2;
+  
+  int lat = packet(0,latl);
+  int lng = packet(latl,latl*2);
+  int nsats = pcaket(latl*2,latl*2+nsatsl);
+  
+  String lat = packet(numshape,numshape+lat_shape);
+  String lng = packet(numshape+lat_shape,numshape+lat_shape)
   Heltec.display->clear();
   Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
   Heltec.display->setFont(ArialMT_Plain_10);
-  Heltec.display->drawString(0 , 15 , "Received "+ packSize + " bytes");
+  Heltec.display->drawStringMaxWidth(0 , 26 , 128, packet);
+  Heltec.display->drawString(0 , 10, " bytes" + packSize);
   Heltec.display->drawStringMaxWidth(0 , 26 , 128, packet);
   Heltec.display->drawString(0, 0, rssi);  
   Heltec.display->display();
