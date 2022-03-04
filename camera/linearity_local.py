@@ -9,7 +9,7 @@ from time import sleep
 import numpy as np
 
 def call(cmd):
-    out = sub.run(cmd.split(), stdout=sub.PIPE, stderr=sub.PIPE)
+    out = sub.run(cmd.split(), stdout=sub.PIPE, stderr=sub.PIPE, timeout=30)
     return out.stdout.decode(), out.stderr.decode()
 
 
@@ -42,13 +42,16 @@ def capture(fname, gain=1, shutter=5000):
         f"--autofocus off "
         f"--awbgains 1,1 "
     )
-    for i in range(10):
+    i=0
+    while i<5:
         try:
             with Watchdog(30):
                 ans = call(cmd)
+                i=0
         except Watchdog:
-            call("sudo reboot")
-        break
+            i+=1
+        
+    call("sudo reboot")
     return ans
 
 
