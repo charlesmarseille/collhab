@@ -35,17 +35,17 @@ void logo(){
 }
 
 void LoRaData(){
-  int mess_len = 14;
-  String mess_num = packet(0,6);
-  int latl = 6;
-  int nsatsl = 2;
-  
-  int lat = packet(0,latl);
-  int lng = packet(latl,latl*2);
-  int nsats = pcaket(latl*2,latl*2+nsatsl);
-  
-  String lat = packet(numshape,numshape+lat_shape);
-  String lng = packet(numshape+lat_shape,numshape+lat_shape)
+//  int mess_len = 14;
+//  String mess_num = packet(0,6);
+//  int latl = 6;
+//  int nsatsl = 2;
+//  
+//  int lat = packet(0,latl);
+//  int lng = packet(latl,latl*2);
+//  int nsats = pcaket(latl*2,latl*2+nsatsl);
+//  
+//  String lat = packet(numshape,numshape+lat_shape);
+//  String lng = packet(numshape+lat_shape,numshape+lat_shape)
   Heltec.display->clear();
   Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
   Heltec.display->setFont(ArialMT_Plain_10);

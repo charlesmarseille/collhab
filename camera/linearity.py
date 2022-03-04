@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+
+import os
+import signal
+import subprocess as sub
+from random import random
+from time import sleep
+
+import numpy as np
+import paramiko
+
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect("192.168.2.244", username="pi", password="hablan1!")
+
+
+def call(cmd):
+    out = sub.run(cmd.split(), stdout=sub.PIPE, stderr=sub.PIPE)
+    return out.stdout.decode(), out.stderr.decode()
+
+
+class Watchdog(Exception):
+    def __init__(self, time=5):
+        self.time = time
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handler)
+        signal.alarm(self.time)
+
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
+
+    def handler(self, signum, frame):
+        raise self
+
+
+def capture(fname, gain=1, shutter=5000):
+    fname += ".dng"
+    if os.path.exists(fname):
+        os.remove(fname)
+
+    cmd = (
+        f"libcamera-still "
+        f"-o image.jpg "
+        f"--analoggain {gain} "
+        f"--shutter {shutter} "
+        f"--flush "
+        f"--nopreview "
+        f"--denoise off "
+        f"--rawfull "
+        f"--raw "
+        f"--autofocus off "
+        f"--awbgains 1,1 "
+    )
+    for i in range(10):
+        try:
+            with Watchdog(30):
+                ans = ssh.exec_command(cmd)[1].read()
+        except Watchdog:
+            ssh.exec_command("sudo reboot")
+            time.sleep(60)
+            ssh.connect("192.168.2.244", username="pi", password="hablan1!")
+            continue
+        err = call(
+            f"sshpass -p hablan1! scp pi@192.168.2.244:image.dng {fname}"
+        )[1]
+        if err:
+            print("ERROR: Capture failed.")
+        ssh.exec_command("rm image.*")
+        break
+    else:
+        print("You have a problem")
+        quit()
+    return ans
+
+
+if __name__ == "__main__":
+    shutters = sorted(
+        (np.logspace(0, 6, 7, dtype=int) * [[1], [2], [5]]).flatten()
+    )
+    N = 10
+
+    input("  - Remove the cap for data aquisition [ENTER] ")
+    for ss in shutters:
+        print(ss)
+        for idx in range(N):
+            sleep(random())
+            capture(f"LINEARITY/{ss}_{idx}", shutter=ss)
+
+    input("  - Put the cap on for a dark [ENTER] ")
+    for ss in shutters:
+        print(ss)
+        for idx in range(N):
+            capture(f"LINEARITY/DARKS/{ss}_{idx}", shutter=ss)
+            sleep(random())
+
+    print("\nDone.")
