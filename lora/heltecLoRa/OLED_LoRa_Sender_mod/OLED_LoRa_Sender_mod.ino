@@ -41,7 +41,7 @@ void setup()
   Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
 
    //(CM) Set LoRa FREQUENCY, SF and BANDWIDTH
-  LoRa.setFrequency(915E6);
+  //LoRa.setFrequency(915E6);
   LoRa.setSpreadingFactor(12);                     //Default: 7, Values: Between 6 and 12
   //LoRa.setSignalBandwidth(62.5E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
   //LoRa.setSyncWord(0x34);           // ranges 0-0xFF, default 0x34, line 172 of https://github.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/blob/master/libdeps/RadioLib/src/modules/SX127x/SX127x.h
@@ -81,8 +81,8 @@ void loop()
  *   - RF_PACONFIG_PASELECT_PABOOST -- LoRa single output via PABOOST, maximum output 20dBm
  *   - RF_PACONFIG_PASELECT_RFO     -- LoRa single output via RFO_HF / RFO_LF, maximum output 14dBm
 */
-  LoRa.setTxPower(14,RF_PACONFIG_PASELECT_PABOOST);
-  LoRa.print("magog ");
+  LoRa.setTxPower(20,RF_PACONFIG_PASELECT_PABOOST);
+  LoRa.print("bolton ");
   LoRa.print(counter);
   LoRa.endPacket();
 

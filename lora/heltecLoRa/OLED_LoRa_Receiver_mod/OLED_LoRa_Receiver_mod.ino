@@ -60,7 +60,7 @@ void cbk(int packetSize) {
   packet ="";
   packSize = String(packetSize,DEC);
   for (int i = 0; i < packetSize; i++) { packet += (char) LoRa.read(); }
-  Serial.println(packet);
+  Serial.println(String(LoRa.packetRssi(), DEC)+","+packet);
   rssi = "RSSI " + String(LoRa.packetRssi(), DEC) ;
   LoRaData();
 }
@@ -97,8 +97,8 @@ void setup() {
 
 
 void loop() {
+  //Serial.println("packet received!");
   int packetSize = LoRa.parsePacket();
-  Serial.println(packetSize);
   if (packetSize) { cbk(packetSize);  }
   delay(10);
 }

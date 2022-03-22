@@ -21,6 +21,8 @@
 #include "heltec.h"
 #include "images.h"
 #include <TinyGPSPlus.h>
+#include <SdFat.h> // https://github.com/greiman/SdFat
+#include <SPI.h>
 
 
 //(CM) uart read taken from https://github.com/Heltec-Aaron-Lee/WiFi_Kit_series/issues/38
@@ -28,13 +30,14 @@
 #define RXD2 23 //16 is used for OLED_RST !
 #define TXD2 17
 #define BAND 915E6  //you can set band here directly,e.g. 868E6,915E6
-#define pin_fs_elrs 36  //input pin to read PWM output from flight controler (to determine if rc link lost)
-#define pin_fs_ghost 37  //input pin to read PWM output from flight controler (to determine if rc link lost)
-#define Fbattery    4200  //The default battery is 3700mv when the battery is fully charged.
+#define Fbattery 4200  //The default battery is 3700mv when the battery is fully charged.
+#define SD_SCK_PIN 5  // Wimos pin D5
+#define SD_MISO_PIN 19  // Wimos pin D6
+#define SD_MOSI_PIN 27  // Wimos pin D7
+#define SD_CHIP_SELECT_PIN 12  // Wimos pin D8
 
 
 //LoRa vars
-unsigned int counter = 0;
 String rssi = "RSSI --";
 String packSize = "--";
 String packet;
@@ -45,15 +48,16 @@ float lat = 000000, lng = 000000;
 float last_good_lat = 10.1, last_good_lng = 10.1;
 int gps_age = 0;
 
-//failsafe vars
-int fs_elrs = 1;
-int fs_ghost = 1;
-
-
 //Vbat measurement vars
 float XS = 0.0030;      //The returned reading is multiplied by this XS to get the battery voltage.
 uint16_t MUL = 1000;
 uint16_t MMUL = 100;
+int time_counter = 0;
+
+//SD card vars
+SdFat sd;
+SdFile myFile;
+
 
 /*GPS infos: https://navspark.mybigcommerce.com/content/NMEA_Format_v0.1.pdf
   GN -> Both GPS and Beidou sats. 2 messages of GNGSA, one for each.
@@ -63,6 +67,21 @@ uint16_t MMUL = 100;
 */
 TinyGPSPlus gps;
 
+void ReadWrite() {
+  String vals[] = {rssi, packet};
+
+  if (!myFile.open("log.txt", O_RDWR | O_CREAT | O_AT_END)) {
+  sd.errorHalt("opening log.txt for write failed");
+  }
+  for (int i=0; i<2; i++) {
+    myFile.print(vals[i]);
+    myFile.print(",");
+  }
+  myFile.println();
+  
+  myFile.close();
+
+}
 
 void logo() {
   Heltec.display->clear();
@@ -190,14 +209,24 @@ static void printStr(const char *str, int len)
   smartDelay(0);
 }
 
-void setup() {
+void cbk(int packetSize) {
+  packet ="";
+  packSize = String(packetSize,DEC);
+  for (int i = 0; i < packetSize; i++) { packet += (char) LoRa.read(); }
+  Serial.println(packet);
+  rssi = "RSSI " + String(LoRa.packetRssi(), DEC) ;
+  //ReadWrite();
+  
+}
+
+void setup() { 
+  Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, false /*PABOOST Enable*/, BAND /*long BAND*/);
+ 
   // GPS uart init
   Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
 
-  // GPI pins for failsafe bits
-  //gpio_reset_pin(37);
-  pinMode(pin_fs_elrs, INPUT);
-  pinMode(pin_fs_ghost, INPUT);
+  //SD card
+  //if (!sd.begin(SD_CHIP_SELECT_PIN, SPI_FULL_SPEED)) sd.initErrorHalt();
 
 
   //Vbat measurement
@@ -216,17 +245,7 @@ void setup() {
   digitalWrite(21, LOW);
   adcAttachPin(37);
 
-  
-  //WIFI Kit series V1 not support Vext control
-  Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-
-  // Set LoRa FREQUENCY, SF and BANDWIDTH
-  LoRa.setFrequency(915E6);
-  LoRa.setSpreadingFactor(12);                     //Default: 7, Values: Between 6 and 12
-  //LoRa.setSignalBandwidth(62.5E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
-  //LoRa.setSyncWord(0x34);           // ranges 0-0xFF, default 0x34, line 172 of https://github.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/blob/master/libdeps/RadioLib/src/modules/SX127x/SX127x.h
-  //LoRa.setPreambleLength(8);       //Default 8
-  //LoRa.setCodingRate4(8);
+   //WIFI Kit series V1 not support Vext control
 
   Heltec.display->init();
   Heltec.display->flipScreenVertically();  
@@ -236,28 +255,28 @@ void setup() {
   Heltec.display->clear();
   
   Heltec.display->drawString(0, 0, "Heltec.LoRa Initial success!");
+  Heltec.display->drawString(0, 10, "Wait for incoming data...");
   Heltec.display->display();
   delay(1000);
+  //LoRa.onReceive(cbk);
+
+  //(CM) Set LoRa FREQUENCY, SF and BANDWIDTH
+  //LoRa.setFrequency(915E6);
+  LoRa.setSpreadingFactor(12);                     //Default: 7, Values: Between 6 and 12
+  //LoRa.setSignalBandwidth(62.5E3);       //Default: 125E3, Values: 7.8E3, 10.4E3, 15.6E3, 20.8E3, 31.25E3, 41.7E3, 62.5E3, 125E3, and 250E3
+  //LoRa.setSyncWord(0x34);           // ranges 0-0xFF, default 0x34, line 172 of https://github.com/Xinyuan-LilyGO/LilyGo-LoRa-Series/blob/master/libdeps/RadioLib/src/modules/SX127x/SX127x.h
+  //LoRa.setPreambleLength(8);       //Default 8
+  //LoRa.setCodingRate4(8);
+  //LoRa.enableCrc();
+
+  //
+  LoRa.receive();
 }
 
+
 void loop() {
-  //Measure Vbat
-  adcStart(37);
-  while(adcBusy(37));
-  Serial.printf("Battery power in GPIO 37: ");
-  Serial.println(analogRead(37));
-  uint16_t vbat  =  analogRead(37)*XS*MUL;
-  adcEnd(37);
 
-  //Check if failsafe on rx
-  fs_elrs = digitalRead(pin_fs_elrs);
-  fs_ghost = digitalRead(pin_fs_ghost);
-  Serial.print("failsafe elrs/ghost: ");
-  Serial.print(fs_elrs);
-  Serial.print("\t");
-  Serial.println(fs_ghost);
-
-  //Print gps data to Serial
+//  //Print gps data to Serial
   printInt(gps.satellites.value(), gps.satellites.isValid(), 5);
   printFloat(gps.hdop.hdop(), gps.hdop.isValid(), 6, 1);
   printFloat(gps.location.lat(), gps.location.isValid(), 11, 6);
@@ -276,65 +295,59 @@ void loop() {
   Serial.println(F("No GPS data received: check wiring"));
 
 
-  //Draw to OLED screen
-  Heltec.display->clear();
-  Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
-  Heltec.display->setFont(ArialMT_Plain_10);
-  if (!gps.location.isValid()){
-    gps_age ++;
-    if (gps_age>59) {
-      int gps_age_m = gps_age/60;
-      int gps_age_s = gps_age%60;
-      Heltec.display->drawString(60, 0, "age: " +String(gps_age_m)+"m"+String(gps_age_s));
+  unsigned long time_elapsed = millis()/1000;
+  if (time_elapsed > time_counter){
+    //Measure Vbat
+    adcStart(37);
+    while(adcBusy(37));
+    Serial.printf("Battery power in GPIO 37: ");
+    Serial.println(analogRead(37));
+    uint16_t vbat  =  analogRead(37)*XS*MUL;
+    adcEnd(37);
+  
+    //Draw to OLED screen
+    Heltec.display->clear();
+    Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+    Heltec.display->setFont(ArialMT_Plain_10);
+    if (!gps.location.isValid()){
+      gps_age ++;
+      if (gps_age>59) {
+        int gps_age_m = gps_age/60;
+        int gps_age_s = gps_age%60;
+        Heltec.display->drawString(60, 0, "age: " +String(gps_age_m)+"m"+String(gps_age_s));
+      }
+      else {
+        Heltec.display->drawString(60, 0, "age: " +String(gps_age)+"s");
+      }
     }
     else {
-      Heltec.display->drawString(60, 0, "age: " +String(gps_age)+"s");
+      gps_age = 0;
+      last_good_lat = lat;
+      last_good_lng = lng; 
     }
-  }
-  else {
-    gps_age = 0;
-    last_good_lat = lat;
-    last_good_lng = lng; 
-  }
-  Heltec.display->drawString(0, 0,  "Count: "+String(counter));
-  Heltec.display->drawString(0, 10, "lat: "+String(last_good_lat));
-  Heltec.display->drawString(0, 20, "lng: "+String(last_good_lng));
-  Heltec.display->drawString(0, 30, "nsats: "+String(gps.satellites.value()));
-  Heltec.display->drawString(0, 40, "hdop: "+String(gps.hdop.hdop()));
-  Heltec.display->drawString(0, 50, "Failsafe elrs--ghost: "+String(fs_elrs)+"--"+String(fs_ghost));
-  Heltec.display->drawString(70, 30, "VBat: "+String(vbat/1000.0));
-  Heltec.display->drawString(0, 60, "msg: "+String(packet));
-  Heltec.display->display();
-
-
-  // Start LoRa packet sending
-  /*
-   * LoRa.setTxPower(txPower,RFOUT_pin);
-   * txPower -- 0 ~ 20
-   * RFOUT_pin could be RF_PACONFIG_PASELECT_PABOOST or RF_PACONFIG_PASELECT_RFO
-   *   - RF_PACONFIG_PASELECT_PABOOST -- LoRa single output via PABOOST, maximum output 20dBm
-   *   - RF_PACONFIG_PASELECT_RFO     -- LoRa single output via RFO_HF / RFO_LF, maximum output 14dBm
-  */
-  LoRa.enableCrc();
-  LoRa.beginPacket();
-  LoRa.setTxPower(20,RF_PACONFIG_PASELECT_PABOOST);
   
-  if (gps.location.isValid()){
-    lat = gps.location.lat()*10000;
-    lng = gps.location.lng()*10000;
+    if (gps.location.isValid()){
+      lat = gps.location.lat()*10000;
+      lng = gps.location.lng()*10000;
+    }
+    String nsats = "00"; 
+    if (gps.satellites.value()<10) nsats = "0"+String(gps.satellites.value());
+    String gps_time = String(gps.time.hour())+String(gps.time.minute())+String(gps.time.second());
+    
+    Heltec.display->drawString(0, 10, "lat: "+String(last_good_lat));
+    Heltec.display->drawString(0, 20, "lng: "+String(last_good_lng));
+    Heltec.display->drawString(0, 30, "nsats: "+String(gps.satellites.value()));
+    Heltec.display->drawString(0, 40, rssi);
+    Heltec.display->drawString(70, 30, "VBat: "+String(vbat/1000.0));
+    Heltec.display->drawString(0, 50, "msg: "+String(packet));
+    Heltec.display->display();
+    
+    time_counter++;
   }
-  String nsats = "00"; 
-  if (gps.satellites.value()<10) nsats = "0"+String(gps.satellites.value());
-  String gps_time = String(gps.time.hour())+String(gps.time.minute())+String(gps.time.second());
-  //String packet = gps_time+String(lat)+String(lng)+nsats;
-  String packet = String(lat)+String(lng)+String(fs_elrs)+String(fs_ghost)+String(vbat);
-  LoRa.print(packet);
-  LoRa.endPacket();
-  Serial.println(packet);
 
-  counter++;
-  digitalWrite(LED, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(2);                       // wait for a second
-  digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
-  delay(2);                       // wait for a second
+  int packetSize = LoRa.parsePacket();
+  Serial.println(packetSize);
+  if (packetSize) { cbk(packetSize);  }
+  
+  delay(10);
 }
