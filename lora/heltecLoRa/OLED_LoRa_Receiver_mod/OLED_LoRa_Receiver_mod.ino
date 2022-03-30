@@ -27,6 +27,7 @@
 String rssi = "RSSI --";
 String packSize = "--";
 String packet ;
+int counter = 0;
 
 void logo(){
   Heltec.display->clear();
@@ -99,6 +100,14 @@ void setup() {
 void loop() {
   //Serial.println("packet received!");
   int packetSize = LoRa.parsePacket();
-  if (packetSize) { cbk(packetSize);  }
+  if (packetSize) { 
+    cbk(packetSize);  
+    counter = 0;
+  }
+  else if (millis()%1000>=1){
+    counter+=1;
+    Heltec.display->drawString(60, 0, "age:" + counter);
+    //Heltec.display->display();
+  }
   delay(10);
 }

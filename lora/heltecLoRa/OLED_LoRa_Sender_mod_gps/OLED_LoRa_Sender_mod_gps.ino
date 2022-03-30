@@ -29,7 +29,7 @@
 #define TXD2 17
 #define BAND 915E6  //you can set band here directly,e.g. 868E6,915E6
 #define pin_fs_elrs 36  //input pin to read PWM output from flight controler (to determine if rc link lost)
-#define pin_fs_ghost 37  //input pin to read PWM output from flight controler (to determine if rc link lost)
+#define pin_fs_ghost 38  //input pin to read PWM output from flight controler (to determine if rc link lost)
 #define Fbattery    4200  //The default battery is 3700mv when the battery is fully charged.
 
 
@@ -42,8 +42,9 @@ String packet;
 //GPS vars
 static const uint32_t GPSBaud = 9600;
 float lat = 000000, lng = 000000;
-float last_good_lat = 10.1, last_good_lng = 10.1;
+float last_good_lat = 0, last_good_lng = 0;
 int gps_age = 0;
+int last_gps_age = 0;
 
 //failsafe vars
 int fs_elrs = 1;
@@ -54,6 +55,7 @@ int fs_ghost = 1;
 float XS = 0.0030;      //The returned reading is multiplied by this XS to get the battery voltage.
 uint16_t MUL = 1000;
 uint16_t MMUL = 100;
+int vbat_delay = 60;
 
 /*GPS infos: https://navspark.mybigcommerce.com/content/NMEA_Format_v0.1.pdf
   GN -> Both GPS and Beidou sats. 2 messages of GNGSA, one for each.
@@ -281,7 +283,7 @@ void loop() {
   Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
   Heltec.display->setFont(ArialMT_Plain_10);
   if (!gps.location.isValid()){
-    gps_age ++;
+    gps_age = millis()/1000 - last_gps_age;
     if (gps_age>59) {
       int gps_age_m = gps_age/60;
       int gps_age_s = gps_age%60;
@@ -292,6 +294,7 @@ void loop() {
     }
   }
   else {
+    last_gps_age = millis()/1000;
     gps_age = 0;
     last_good_lat = lat;
     last_good_lng = lng; 
@@ -302,7 +305,7 @@ void loop() {
   Heltec.display->drawString(0, 30, "nsats: "+String(gps.satellites.value()));
   Heltec.display->drawString(0, 40, "hdop: "+String(gps.hdop.hdop()));
   Heltec.display->drawString(0, 50, "Failsafe elrs--ghost: "+String(fs_elrs)+"--"+String(fs_ghost));
-  Heltec.display->drawString(70, 30, "VBat: "+String(vbat/1000.0));
+  Heltec.display->drawString(70, 30, "VBat: "+String((vbat/100000)));
   Heltec.display->drawString(0, 60, "msg: "+String(packet));
   Heltec.display->display();
 
@@ -333,8 +336,16 @@ void loop() {
   Serial.println(packet);
 
   counter++;
-  digitalWrite(LED, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(2);                       // wait for a second
-  digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
-  delay(2);                       // wait for a second
+  if (vbat<4){
+    digitalWrite(LED, HIGH);   // turn the LED on (HIGH is the voltage level)
+    delay(1);
+    digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
+    delay(1);    
+  }
+  else {
+    digitalWrite(LED, HIGH);   // turn the LED on (HIGH is the voltage level)
+    delay(1);
+    digitalWrite(LED, LOW);    // turn the LED off by making the voltage LOW
+    delay(1);    
+  }
 }
